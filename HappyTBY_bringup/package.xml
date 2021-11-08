@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>HappyTBY_core</name>
+  <name>HappyTBY_bringup</name>
   <version>0.0.0</version>
-  <description>The HappyTBY_core package</description>
+  <description>The HappyTBY_bringup package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
-  <maintainer email="bhbhchoi@todo.todo">bhbhchoi</maintainer>
+  <maintainer email="bhbhchoi@yu.ac.kr">bhbhchoi</maintainer>
 
 
   <!-- One license tag required, multiple allowed, one license per tag -->
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/HappyTBY_core</url> -->
+  <!-- <url type="website">http://wiki.ros.org/HappyTBY_bringup</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->

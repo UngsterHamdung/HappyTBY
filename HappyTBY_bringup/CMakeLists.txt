@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(HappyTBY_core)
+project(HappyTBY_bringup)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -108,7 +108,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES HappyTBY_core
+  LIBRARIES HappyTBY_bringup
   CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy sensor_msgs std_msgs tf
   DEPENDS system_lib
 )
@@ -126,7 +126,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/HappyTBY_core.cpp
+#   src/${PROJECT_NAME}/HappyTBY_bringup.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -137,11 +137,11 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/HappyTBY_core_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/HappyTBY_bringup_node.cpp)
 
-add_executable(HappyTBY_core_node src/HappyTBY_core_node.cpp)
-add_dependencies(HappyTBY_core_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(HappyTBY_core_node ${catkin_LIBRARIES})
+add_executable(HappyTBY_bringup_node src/HappyTBY_bringup_node.cpp)
+add_dependencies(HappyTBY_bringup_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(HappyTBY_bringup_node ${catkin_LIBRARIES})
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -205,7 +205,7 @@ target_link_libraries(HappyTBY_core_node ${catkin_LIBRARIES})
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_HappyTBY_core.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_HappyTBY_bringup.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

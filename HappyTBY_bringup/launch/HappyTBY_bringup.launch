@@ -13,9 +13,9 @@
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />  
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find HappyTBY_bringup)/rviz/HappyTBY_bringup.rviz" /> 
   
-  <node pkg="sc_mini" type="sc_mini" name="sc_mini" output="screen">
+  <!--node pkg="sc_mini" type="sc_mini" name="sc_mini" output="screen">
     <param name="frame_id" type="string" value="link_lidar"/>
     <param name="port" type="string" value="/dev/sc_mini"/>
     <param name="baud_rate" type="int" value="115200"/>
-  </node>
+  </node-->
 </launch>

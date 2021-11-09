@@ -15,5 +15,6 @@
   <exec_depend>HappyTBY_slam</exec_depend>
   <exec_depend>sc_mini</exec_depend>
   <exec_depend>handsfree_ros_imu</exec_depend>
+  <exec_depend>jetson_camera</exec_depend>
   <export><metapackage/></export>
 </package>

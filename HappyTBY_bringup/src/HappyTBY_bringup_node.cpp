@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sstream>
+#include <cmath>
 
 //i2c address
 #define ADDRESS 0x05
@@ -37,6 +38,8 @@ static const char * deviceName = "/dev/i2c-0";
 #define LIDAR_Obastacle 0.6
 #define LIDAR_Wall_Detection 0.30
 
+#define WHEEL_RADIUS 0.05
+
 int Base_Speed = 130;
 
 //////////////////////////////// Odometry ////////////////////////////
@@ -44,14 +47,12 @@ int Base_Speed = 130;
 struct BaseSensorData {
     int encoder = 0;
     int encoder_old = 0;
-}
-myBaseSensorData;
+} myBaseSensorData;
 
 struct OdomCaculateData {
     //motor params
-    float distance_ratio = (67.6 * 3.14159 / 1000) / 2200; //0.000176; unit: m/encoder  67.5
-    float wheel_distance = 0.226; //0.1495; unit: m
-    float encode_sampling_time = 0.05; //unit: s-> 20hz
+    // float distance_ratio = (67.6 * 3.14159 / 1000) / 2200; //0.000176; unit: m/encoder  67.5
+    float distance_ratio = (2*WHEEL_RADIUS*M_PI) / 408.4;
     float cmd_vel_linear_max = 0.8; //unit: m/s
     float cmd_vel_angular_max = 0.0; //unit: rad/s
     //odom result
@@ -60,9 +61,7 @@ struct OdomCaculateData {
     float oriention = 0.0; //unit: rad
     float velocity_linear = 0.0; //unit: m/s
     float velocity_angular = 0.0; //unit: rad/s
-
-}
-myOdomCaculateData;
+} myOdomCaculateData;
 
 int steering_angle = STEER_NEUTRAL_ANGLE;
 int motor_speed = 0;
@@ -121,8 +120,7 @@ void CarControlCallback(const geometry_msgs::Twist & msg) {
         motor_speed = 250;
     if (motor_speed <= -250) 
         motor_speed = -250;
-
-    }
+}
 
 void CarSteerControlCallback(const std_msgs::Int16 & angle) {
     steering_angle = (int)(angle.data + STEER_NEUTRAL_ANGLE);
@@ -131,7 +129,7 @@ void CarSteerControlCallback(const std_msgs::Int16 & angle) {
         steering_angle = STEER_NEUTRAL_ANGLE + 40;
     if (steering_angle <= -40 + STEER_NEUTRAL_ANGLE) 
         steering_angle = STEER_NEUTRAL_ANGLE - 40;
-    }
+}
 
 void scanCallback(const sensor_msgs::LaserScan::ConstPtr & scan) {
     int count = (int)(360. / RAD2DEG(scan -> angle_increment));
@@ -139,27 +137,14 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr & scan) {
     int sum_l = 0,
     sum_r = 0;
     double dist_y = 0.0;
-    // ROS_INFO("I heard a laser scan %s[%d]:", scan->header.frame_id.c_str(),
-    // count); ROS_INFO("%f %f",scan->scan_time , scan->time_increment);
-    // ROS_INFO("angle_range, %f, %f %f", RAD2DEG(scan->angle_min),
-    // RAD2DEG(scan->angle_max), RAD2DEG(scan->angle_increment));
-    /*
-    for(int i = 0; i < count; i++)
-    {
-        float degree = RAD2DEG(scan->angle_min + scan->angle_increment * i);
-        ROS_INFO(": [%f, %f]", degree, scan->ranges[i]);
-    }
-    */
 
     for (int i = 0; i < count; i++) {
         float degree = RAD2DEG(scan -> angle_min + scan -> angle_increment * i);
 
         if (((degree >= 90 - 15) && (degree <= 90 + 15))) {
             dist_y = fabs(scan -> ranges[i] * sin(DEG2RAD(degree)));
-            // ROS_INFO(": [%f, %f]", degree, scan->ranges[i]);
             if ((dist_y <= LIDAR_Obastacle) && (dist_y > LIDAR_Wall_Detection)) {
                 sum++;
-                //ROS_INFO("sum 2= %d", sum);
             }
         }
 
@@ -196,39 +181,41 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr & scan) {
     } else 
         motor_speed = Base_Speed;
 
-    }
+}
 
 void odometry_cal(void) {
-    int delta_encoder = myBaseSensorData.encoder - myBaseSensorData.encoder_old;
-    float delta_x, delta_y, delta_d, delta_theta;
+    int d_encoder = myBaseSensorData.encoder - myBaseSensorData.encoder_old;
+    float d_x, d_y, d_r, d_th;
 
-    delta_d = delta_encoder * myOdomCaculateData.distance_ratio;
-    // printf("delta_encoder %d
-    // %d\n",myBaseSensorData.encoder,myBaseSensorData.encoder_old);
+    //d_encoder = (left_diff + right_diff)/2
+    d_r = d_encoder * myOdomCaculateData.distance_ratio;
 
     if (motor_speed == 0) {
-        delta_theta = 0;
+        d_th = 0;
     } else {
-        delta_theta = DEG2RAD((steering_angle - STEER_NEUTRAL_ANGLE) * 0.008);
+        d_th = DEG2RAD((steering_angle - STEER_NEUTRAL_ANGLE) * 0.008);
     }
-    delta_x = delta_d * cos(myOdomCaculateData.oriention - delta_theta);
-    delta_y = delta_d * sin(myOdomCaculateData.oriention - delta_theta);
-    myOdomCaculateData.position_x += delta_x; //unit: m
-    myOdomCaculateData.position_y += delta_y; //unit: m
-    myOdomCaculateData.oriention -= delta_theta; //unit: rad
+    d_x = d_r * cos(myOdomCaculateData.oriention - d_th);
+    d_y = d_r * sin(myOdomCaculateData.oriention - d_th);
+    myOdomCaculateData.position_x += d_x; //unit: m
+    myOdomCaculateData.position_y += d_y; //unit: m
+    myOdomCaculateData.oriention -= d_theta; //unit: rad
+
+    ros::Time timestamp_now = ros::Time::now();
+    unsigned long timestamp_now_nsec = timestamp_now.toNsec();
+    unsigned long d_time = (timestamp_now_nsec - timestamp_now_nsec_old) / 1000000000.0;
+    timestamp_now_nsec_old = timestamp_now_nsec;
+
+    myOdomCaculateData.velocity_linear = d_r/float(d_time);
+    myOdomCaculateData.velocity_angular = d_th/float(d_time);
 
     if (DEBUG == 1) 
-        printf(
-            " %6.3lf %6.3lf %6.3lf \n",
-            myOdomCaculateData.position_x,
-            myOdomCaculateData.position_y,
-            RAD2DEG(myOdomCaculateData.oriention)
-        );
-    }
+        printf(" %6.3lf %6.3lf %6.3lf \n", myOdomCaculateData.position_x, myOdomCaculateData.position_y, RAD2DEG(myOdomCaculateData.oriention));
+}
 
 int main(int argc, char ** argv) {
     char buf[2];
-    ros::init(argc, argv, "Car_Control");
+    ros::init(argc, argv, "happytby_bringup");
 
     ros::NodeHandle n;
     std::string cmd_vel_topic = "cmd_vel";
@@ -238,42 +225,16 @@ int main(int argc, char ** argv) {
     ros::param::get("~odom_pub_topic", odom_pub_topic);
 
     ros::Subscriber sub1 = n.subscribe("/cmd_vel", 10, & CarControlCallback);
-    ros::Subscriber sub2 = n.subscribe(
-        "/Car_Control_cmd/SteerAngle_Int16",
-        10,
-        & CarSteerControlCallback
-    );
-    ros::Subscriber sub3 = n.subscribe < sensor_msgs::LaserScan > (
-        "/scan",
-        1000,
-        & scanCallback
-    );
+    ros::Subscriber sub2 = n.subscribe( "/Car_Control_cmd/SteerAngle_Int16", 10, & CarSteerControlCallback);
+    ros::Subscriber sub3 = n.subscribe<sensor_msgs::LaserScan>( "/scan", 1000, & scanCallback);
 
     //ros::Publisher chatter_pub = n.advertise<std_msgs::String>("chatter", 1000);
-    ros::Publisher car_control_pub1 = n.advertise < std_msgs::String > (
-        "Car_Control/SteerAngle_msgs",
-        10
-    );
-    ros::Publisher car_control_pub2 = n.advertise < std_msgs::String > (
-        "Car_Control/Speed_msgs",
-        10
-    );
-    ros::Publisher car_control_pub3 = n.advertise < std_msgs::Int16 > (
-        "Car_Control/SteerAngle_Int16",
-        10
-    );
-    ros::Publisher car_control_pub4 = n.advertise < std_msgs::Int16 > (
-        "Car_Control/Speed_Int16",
-        10
-    );
-    ros::Publisher car_control_pub5 = n.advertise < sensor_msgs::Range > (
-        "/RangeSonar1",
-        10
-    );
-    ros::Publisher car_control_pub6 = n.advertise < nav_msgs::Odometry > (
-        odom_pub_topic,
-        20
-    );
+    ros::Publisher car_control_pub1 = n.advertise<std_msgs::String>( "Car_Control/SteerAngle_msgs", 10);
+    ros::Publisher car_control_pub2 = n.advertise<std_msgs::String>( "Car_Control/Speed_msgs", 10);
+    ros::Publisher car_control_pub3 = n.advertise<std_msgs::Int16>( "Car_Control/SteerAngle_Int16", 10);
+    ros::Publisher car_control_pub4 = n.advertise<std_msgs::Int16>( "Car_Control/Speed_Int16", 10);
+    ros::Publisher car_control_pub5 = n.advertise<sensor_msgs::Range>( "/RangeSonar1", 10);
+    ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>(odom_pub_topic, 20);
 
     ////////////////   sonar _sensor ////////////////////
     sensor_msgs::Range sonar_msg;
@@ -295,11 +256,7 @@ int main(int argc, char ** argv) {
     } else {
         ROS_INFO_STREAM("I2C is Connected");
     }
-
-    /**
-   * A count of how many messages we have sent. This is used to create
-   * a unique string for each message.
-   */
+    
     int count = 0;
     static tf::TransformBroadcaster odom_broadcaster;
     geometry_msgs::TransformStamped odom_trans;
@@ -314,19 +271,13 @@ int main(int argc, char ** argv) {
         0, 0, 0, 99999, 0, 0, // large covariance on rot x
         0, 0, 0, 0, 99999, 0, // large covariance on rot y
         0, 0, 0, 0, 0, 0.01
-    }; // large covariance on rot z
-    //load covariance matrix
+    };
+
     for (int i = 0; i < 36; i++) {
-        odom
-            .pose
-            .covariance[i] = covariance[i];;
+        odom.pose.covariance[i] = covariance[i];
     }
 
     while (ros::ok()) {
-        /**
-     * This is a message object. You stuff it with data, and then publish it.
-     */
-
         std_msgs::String msg;
         std_msgs::Int16 steerangle;
         std_msgs::Int16 carspeed;
@@ -340,12 +291,6 @@ int main(int argc, char ** argv) {
         msg.data = ss.str();
         ROS_INFO("Steer : %s", msg.data.c_str());
 
-        /**
-     * The publish() function is how you send messages. The parameter
-     * is the message object. The type of this object must agree with the type
-     * given as a template parameter to the advertise<>() call, as was done
-     * in the constructor above.
-     */
         car_control_pub1.publish(msg);
 
         data = std::to_string(motor_speed);
@@ -354,6 +299,7 @@ int main(int argc, char ** argv) {
         ROS_INFO("Speed : %s", msg.data.c_str());
 
         if ((steering_angle != steering_angle_old) || (motor_speed != motor_speed_old)) {
+            // write
             protocol_data[0] = '#';
             protocol_data[1] = 'C';
             protocol_data[2] = (steering_angle & 0xff00) >> 8;
@@ -363,6 +309,8 @@ int main(int argc, char ** argv) {
             protocol_data[6] = '*';
 
             write(file_I2C, protocol_data, 7);
+
+            // read
             read(file_I2C, buf, 8);
             sonar = (buf[1] * 256 + buf[2]) / 1000.0;
 
@@ -371,23 +319,33 @@ int main(int argc, char ** argv) {
             temp[0] = buf[3];
 
             if (((buf[3] & 0x80) >> 7) == 1) { //check MSB bit is 1 -> negative
-                temp[0] = 255 - buf[3];
-                temp[1] = 255 - buf[4];
-                temp[2] = 255 - buf[5];
-                temp[3] = 256 - buf[6];
+                // temp[0] = 255 - buf[3];
+                // temp[1] = 255 - buf[4];
+                // temp[2] = 255 - buf[5];
+                // temp[3] = 256 - buf[6];
 
-                encoder_temp = ((temp[0] << 32) & 0xff000000) | (temp[1] << 16) | (temp[2] << 8) | (temp[3]);
-                // printf("sig is negative\n");  printf("~ : %3d  %3d  %3d
-                // %3d\n",temp[0],temp[1],temp[2], temp[3]);
-                encoder = -encoder_temp;
-            } else {
+                // encoder_temp = ((temp[0] << 32) & 0xff000000) | (temp[1] << 16) | (temp[2] << 8) | (temp[3]);
+                temp[0] = (long)(255 - buf[3]);
+                temp[1] = (long)(255 - buf[4]);
+                temp[2] = (long)(255 - buf[5]);
+                temp[3] = (long)(256 - buf[6]);
+
+                encoder_temp = -(temp[0] + temp[1] + temp[2] + temp[3]);
+            }
+            else {
+                // temp[1] = (long)buf[4];
+                // temp[2] = (long)buf[5];
+                // temp[3] = (long)buf[6];
+                // encoder_temp = ((temp[0] << 32) & 0xff000000) | (temp[1] << 16) | (temp[2] << 8) | (temp[3]);
                 temp[1] = (long)buf[4];
                 temp[2] = (long)buf[5];
                 temp[3] = (long)buf[6];
-                encoder_temp = ((temp[0] << 32) & 0xff000000) | (temp[1] << 16) | (temp[2] << 8) | (temp[3]);
-                encoder = encoder_temp;
+
+                encoder_temp = temp[0] + temp[1] + temp[2] + temp[3];
             }
-        } else {
+            encoder = encoder_temp;
+        }
+        else {
             protocol_data[0] = '#';
             protocol_data[1] = 'S';
             protocol_data[2] = (steering_angle_old & 0xff00) >> 8;
@@ -405,23 +363,21 @@ int main(int argc, char ** argv) {
             temp[0] = buf[3];
 
             if (((buf[3] & 0x80) >> 7) == 1) { //check MSB bit is 1 -> negative
-                //temp[0] &= 0x80;
-                temp[0] = 255 - buf[3];
-                temp[1] = 255 - buf[4];
-                temp[2] = 255 - buf[5];
-                temp[3] = 256 - buf[6];
+                temp[0] = (long)(255 - buf[3]);
+                temp[1] = (long)(255 - buf[4]);
+                temp[2] = (long)(255 - buf[5]);
+                temp[3] = (long)(256 - buf[6]);
 
-                encoder_temp = ((temp[0] << 32) & 0xff000000) | (temp[1] << 16) | (temp[2] << 8) | (temp[3]);
-                // printf("sig is negative\n");  printf("~ : %3d  %3d  %3d
-                // %3d\n",temp[0],temp[1],temp[2], temp[3]);
-                encoder = -encoder_temp;
-            } else {
+                encoder_temp = -(temp[0] + temp[1] + temp[2] + temp[3]);
+            }
+            else {
                 temp[1] = (long)buf[4];
                 temp[2] = (long)buf[5];
                 temp[3] = (long)buf[6];
-                encoder_temp = ((temp[0] << 32) & 0xff000000) | (temp[1] << 16) | (temp[2] << 8) | (temp[3]);
-                encoder = encoder_temp;
+
+                encoder_temp = temp[0] + temp[1] + temp[2] + temp[3];
             }
+            encoder = encoder_temp;
 
         }
 
@@ -453,23 +409,21 @@ int main(int argc, char ** argv) {
             temp[0] = buf[3];
 
             if (((buf[3] & 0x80) >> 7) == 1) { //check MSB bit is 1 -> negative
-                //temp[0] &= 0x80;
-                temp[0] = 255 - buf[3];
-                temp[1] = 255 - buf[4];
-                temp[2] = 255 - buf[5];
-                temp[3] = 256 - buf[6];
+                temp[0] = (long)(255 - buf[3]);
+                temp[1] = (long)(255 - buf[4]);
+                temp[2] = (long)(255 - buf[5]);
+                temp[3] = (long)(256 - buf[6]);
 
-                encoder_temp = ((temp[0] << 32) & 0xff000000) | (temp[1] << 16) | (temp[2] << 8) | (temp[3]);
-                // printf("sig is negative\n");  printf("~ : %3d  %3d  %3d
-                // %3d\n",temp[0],temp[1],temp[2], temp[3]);
-                encoder = -encoder_temp;
-            } else {
+                encoder_temp = -(temp[0] + temp[1] + temp[2] + temp[3]);
+            }
+            else {
                 temp[1] = (long)buf[4];
                 temp[2] = (long)buf[5];
                 temp[3] = (long)buf[6];
-                encoder_temp = ((temp[0] << 32) & 0xff000000) | (temp[1] << 16) | (temp[2] << 8) | (temp[3]);
-                encoder = encoder_temp;
+
+                encoder_temp = temp[0] + temp[1] + temp[2] + temp[3];
             }
+            encoder = encoder_temp;
         } else {
             motor_speed = Base_Speed;
         }
@@ -506,10 +460,12 @@ int main(int argc, char ** argv) {
         odom.pose.pose.position.y = myOdomCaculateData.position_y;
         odom.pose.pose.position.z = 0.0;
         odom.pose.pose.orientation = odom_quat;
-        // odom.twist.twist.linear.x = myOdomCaculateData.velocity_linear;
-        // odom.twist.twist.angular.z = myOdomCaculateData.velocity_angular;
+        odom.twist.twist.linear.x = myOdomCaculateData.velocity_linear;
+        odom.twist.twist.linear.y = odom.twist.twist.linear.z = 0;
+        odom.twist.twist.angular.z = myOdomCaculateData.velocity_angular;
+        odom.twist.twist.angular.x = odom.twist.twist.angular.y = 0;
         odom_broadcaster.sendTransform(odom_trans);
-        car_control_pub6.publish(odom);
+        odom_pub.publish(odom);
 
         loop_rate.sleep();
         ros::spinOnce();

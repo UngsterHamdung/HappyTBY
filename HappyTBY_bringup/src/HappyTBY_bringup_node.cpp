@@ -38,8 +38,8 @@ static const char * deviceName = "/dev/i2c-0";
 #define LIDAR_Obastacle 0.6
 #define LIDAR_Wall_Detection 0.30
 
-#define WHEEL_RADIUS 0.05
-
+#define WHEEL_RADIUS 0.0365
+#define COOUNT_PER_REV 3000
 int Base_Speed = 130;
 
 //////////////////////////////// Odometry ////////////////////////////
@@ -52,7 +52,7 @@ struct BaseSensorData {
 struct OdomCaculateData {
     //motor params
     // float distance_ratio = (67.6 * 3.14159 / 1000) / 2200; //0.000176; unit: m/encoder  67.5
-    float distance_ratio = (2*WHEEL_RADIUS*M_PI) / 408.4;
+    float distance_ratio = (2*WHEEL_RADIUS*M_PI) / COOUNT_PER_REV;
     float cmd_vel_linear_max = 0.8; //unit: m/s
     float cmd_vel_angular_max = 0.0; //unit: rad/s
     //odom result
@@ -183,6 +183,8 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr & scan) {
 
 }
 
+unsigned long timestamp_now_nsec_old = 0;
+
 void odometry_cal(void) {
     int d_encoder = myBaseSensorData.encoder - myBaseSensorData.encoder_old;
     float d_x, d_y, d_r, d_th;
@@ -199,10 +201,10 @@ void odometry_cal(void) {
     d_y = d_r * sin(myOdomCaculateData.oriention - d_th);
     myOdomCaculateData.position_x += d_x; //unit: m
     myOdomCaculateData.position_y += d_y; //unit: m
-    myOdomCaculateData.oriention -= d_theta; //unit: rad
+    myOdomCaculateData.oriention -= d_th; //unit: rad
 
     ros::Time timestamp_now = ros::Time::now();
-    unsigned long timestamp_now_nsec = timestamp_now.toNsec();
+    unsigned long timestamp_now_nsec = timestamp_now.toNSec();
     unsigned long d_time = (timestamp_now_nsec - timestamp_now_nsec_old) / 1000000000.0;
     timestamp_now_nsec_old = timestamp_now_nsec;
 

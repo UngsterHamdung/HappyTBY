@@ -90,27 +90,40 @@ void clearEncoderCount(int encoder_no) {
 unsigned long lastTime,now;
 double input = 0;
 
-#define MOTOR_PWM 5 
-#define MOTOR_DIR 4
+#define STBY1  39
+#define STBY2  40
+
+#define MOTOR1_EN1 32
+#define MOTOR1_EN2 31
+#define MOTOR1_PWM 8
 
 int Motor_Speed = 0;
 
-void motor_control(int dir, int motor_pwm)
-{
-  
-  if(dir == 1) // forward
-  { 
-    digitalWrite(MOTOR_DIR,LOW);
-    analogWrite(MOTOR_PWM,motor_pwm);    
-  }
-  else if(dir == -1) // backward
+void motor_control(int dir, int speed) {
+  digitalWrite(STBY1, HIGH);
+  switch(dir)
   {
-    digitalWrite(MOTOR_DIR, HIGH);
-    analogWrite(MOTOR_PWM,motor_pwm);
-  }
-  else // stop
-  {
-    analogWrite(MOTOR_PWM,0);
+     case  1: digitalWrite(MOTOR1_EN1, HIGH);
+              digitalWrite(MOTOR1_EN2, LOW);
+              analogWrite(MOTOR1_PWM, speed);
+              break; 
+      
+     case -1:    
+              digitalWrite(MOTOR1_EN1, LOW);
+              digitalWrite(MOTOR1_EN2, HIGH);
+              analogWrite(MOTOR1_PWM, speed);    
+              break;
+
+     case 0:
+              digitalWrite(MOTOR1_EN1, LOW);
+              digitalWrite(MOTOR1_EN2, LOW);
+              analogWrite(MOTOR1_PWM, 0);
+              break;
+     default:                  
+              digitalWrite(MOTOR1_EN1, LOW);
+              digitalWrite(MOTOR1_EN2, LOW);
+              analogWrite(MOTOR1_PWM, 0);
+              break;     
   }
 }
 
@@ -124,8 +137,7 @@ void motor_control(int dir, int motor_pwm)
 NewPing sonar(9,10,Sonar_MAX_Distance);
 int sonar_d = 0;
 
-void sonar_sensor_read(void)
-{
+void sonar_sensor_read(void) {
   sonar_d=sonar.ping_cm();
   if(sonar_d == 0) sonar_d = Sonar_MAX_Distance;  
 }
@@ -190,10 +202,10 @@ void requestEvent()
   // s[4]= (encoderPos&0x00ff0000)>>16;
   // s[5]= (encoderPos&0x0000ff00)>>8;
   // s[6]= (encoderPos&0x000000ff);        // encoder LSB 8bit
-  s[3]= (signed long)count_1<<24;    // encoder MSB 8bit
-  s[4]= (signed long)count_2<<16;
-  s[5]= (signed long)count_3<<8;
-  s[6]= (signed long)count_4;        // encoder LSB 8bit
+  s[3]= (count_1&0xff000000)<<24;    // encoder MSB 8bit
+  s[4]= (count_2&0x00ff0000)<<16;
+  s[5]= (count_3&0x0000ff00)<<8;
+  s[6]= (count_4&0x000000ff);        // encoder LSB 8bit
   s[7]='*'; 
   
   Wire.write(s,8); // respond 
@@ -207,6 +219,8 @@ void setup()
   Wire.onReceive(receiveEvent);
   initEncoders();       Serial.println("Encoders Initialized...");  
   clearEncoderCount(1);  Serial.println("Encoder[1] Cleared...");
+  pinMode(STBY1, OUTPUT); pinMode(STBY2, OUTPUT);
+  pinMode(MOTOR1_EN1, OUTPUT);   pinMode(MOTOR1_EN2, OUTPUT);   pinMode(MOTOR1_PWM, OUTPUT);
   Steeringservo.attach(RC_SERVO_PIN);
   Steeringservo.write(Steering_Angle);
   pinMode(TRIG, OUTPUT);
@@ -225,25 +239,34 @@ void loop()
       lastTime=now;
       readEncoder(1);
   }
+  //motor_control(1, 100);
   sonar_sensor_read();
   if(debug == 1)
   {   
     ///////////// Steering Servo  ////////////// 
-    Serial.print("Sonar : ");
-    Serial.print(sonar_d);
-    Serial.print("cm");    
+    //Serial.print("Sonar : ");
+    //Serial.print(sonar_d);
+    //Serial.print("cm");    
 
     ///////////// Steering Servo  /////////////
-    Serial.print("  Steering Angle : ");
-    Serial.print(Steering_Angle);
+    //Serial.print("  Steering Angle : ");
+    //Serial.print(Steering_Angle);
 
     ////////////// encoder  ///////////////////
     Serial.print("  Encoder Pos : ");       
     Serial.print(encoderPos);
+    Serial.print("  count_1 : ");       
+    Serial.print(count_1, BIN);
+    Serial.print("  count_2 : ");       
+    Serial.print(count_2, BIN);
+    Serial.print("  count_3 : ");       
+    Serial.print(count_3, BIN);
+    Serial.print("  count_4 : ");       
+    Serial.println(count_4, BIN);
     
     /////////////// Motor PWM  ///////////////// 
-    Serial.print("  Motor PWM : ");
-    Serial.println(Motor_Speed);
+    //Serial.print("  Motor PWM : ");
+    //Serial.println(Motor_Speed);
   }
   
 }

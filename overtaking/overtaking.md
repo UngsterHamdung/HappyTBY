@@ -37,7 +37,8 @@ Mat Draw_Guide_Line(Mat img)
     /*Mat result_img;*/
     img.copyTo(img);
 
-    line(img, Point(0, 420), Point(640, 420), Scalar(0, 255, 255), 1, 0);
+    line(img, Point(0, 300), Point(640, 300), Scalar(0, 255, 255), 1, 0);
+    line(img, Point(0, 410), Point(640, 410), Scalar(0, 255, 255), 1, 0);
    
 
 

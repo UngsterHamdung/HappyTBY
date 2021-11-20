@@ -179,13 +179,13 @@ void ImageCallbak(const sensor_msgs::Image::ConstPtr &img)
             if (circle_R > circle_L)
             {
                 printf("\ngo right\n");
-                msg.angular.z = 1;
+                msg.angular.z = -1;
                 
             }
             else if (circle_L > circle_R)
             {
                 printf("\ngo Left\n");
-                msg.angular.z = -1;
+                msg.angular.z = +1;
             }
             else
             {

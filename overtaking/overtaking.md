@@ -22,7 +22,8 @@
 #include <opencv2/highgui/highgui.hpp> 
 #include <cv_bridge/cv_bridge.h> 
 #include "geometry_msgs/Twist.h" 
-
+#define ASSIST_BASE_LINE 390 
+#define ASSIST_BASE_WIDTH 90
 
 
 using namespace cv; 
@@ -96,7 +97,11 @@ void ImageCallbak(const sensor_msgs::Image::ConstPtr &img)
   }
  
   Mat mat_image_org_color = cv_ptr->image; 
-  Mat mat_image_roi, mat_image_canny_edge,mat_image_org_gray, mat_image_roiL, mat_image_roiR; 
+  float intersect_R[20] = { 0, };
+  float intersect_L[20] = { 0, };
+  float intersect_R1[20] = { 0, };
+  float intersect_L1[20] = { 0, };
+  Mat mat_image_org_gray_L, mat_image_org_gray_R, mat_image_canny_edge_R, mat_image_canny_edge_L, mat_image_org_color, mat_image_org_gray, mat_image_roi, mat_image_roiL,   mat_image_roiR, mat_image_canny_edge; 
  
   
   int count = 0;
@@ -123,81 +128,149 @@ void ImageCallbak(const sensor_msgs::Image::ConstPtr &img)
     points_R[1] = Point(320, 480);
     points_R[2] = Point(640, 480);
     points_R[3] = Point(640, 360);  
-  cvtColor(mat_image_org_color, mat_image_org_gray, cv::COLOR_RGB2GRAY);       
-  mat_image_roi = Region_of_Interest_crop(mat_image_org_gray, points);       
-  mat_image_canny_edge = Canny_Edge_Detection(mat_image_roi);
+  mat_image_roiR = Region_of_Interest_crop(mat_image_org_color, points_R);
+        cvtColor(mat_image_roiR, mat_image_org_gray_R, cv::COLOR_RGB2GRAY);// ROI 영역을 추출함      
+        mat_image_canny_edge_R = Canny_Edge_Detection(mat_image_org_gray_R);
+
+        mat_image_roiL = Region_of_Interest_crop_L(mat_image_org_color, points_L);    // ROI 영역을 추출함      
+        cvtColor(mat_image_roiL, mat_image_org_gray_L, cv::COLOR_RGB2GRAY);
+        mat_image_canny_edge_L = Canny_Edge_Detection(mat_image_org_gray_L);
+        vector<Vec4i> linesP_L, linesP_R;
+        HoughLinesP(mat_image_canny_edge_R, linesP_R, 1, CV_PI / 180, 30, 15, 10);
+        HoughLinesP(mat_image_canny_edge_L, linesP_L, 1, CV_PI / 180, 30, 15, 10);
+
+        //printf("Line Number : %3d\n", (int)linesP.size());
+        //mat_image_roiR = Region_of_Interest_crop(mat_image_org_color, points_R);
+        //mat_image_roiL = Region_of_Interest_crop_L(mat_image_org_color, points_L);
+        for (int i = 0; i < linesP_L.size(); i++)
+        {
+           
+            if (i >= NO_LINE) break;
+            Vec4i LL = linesP_L[i];
+            /*
+            int cx1 = linesP[i][0];
+            int cy1 = linesP[i][1];
+            int cx2 = linesP[i][2];
+            int cy2 = linesP[i][3];
+            */
+            //printf("드감?");
+            c_L[i] = ((float)LL[2] - (float)LL[0]) / ((float)LL[3] - (float)LL[1]); // gradient
+
+            d_L[i] = (float)LL[0] - c_L[i] * (float)LL[1]; // intersect
+            if (fabs(c_L[i]) < DEG2RAD(65))
+            {
+
+                intersect_L[i] = c_L[i] * (float)10 + d_L[i];
+                intersect_L1[i] = c_L[i] * (float)110 + d_L[i];
+                //intersect_L[i] = c[i] * (float)ASSIST_BASE_WIDTH + d[i];
+
+                if (intersect_L)
+                {
+                    circle_L++;
+                }
+                if (intersect_L1)
+                {
+                    circle_L++;
+                }
+                line(mat_image_org_color, Point(LL[0], LL[1] + 300), Point(LL[2], LL[3] + 300), Scalar(0, 0, 255), 2, LINE_AA);
+                circle(mat_image_org_color, Point(intersect_L1[i], 420), 10, Scalar(255, 0, 0), -1);
+                circle(mat_image_org_color, Point(intersect_L[i], 310), 10, Scalar(255, 0, 0), -1);
+
+            }
+
+        }
+        for (int j = 0; j < linesP_R.size(); j++)
+        {
+
+            if (j >= NO_LINE) break;
+            Vec4i L = linesP_R[j];
+            /*
+            int cx1 = linesP[i][0];
+            int cy1 = linesP[i][1];
+            int cx2 = linesP[i][2];
+            int cy2 = linesP[i][3];
+            */
+            //printf("드감?");
+            c_R[j] = ((float)L[2] - (float)L[0]) / ((float)L[3] - (float)L[1]); // gradient
+
+            d_R[j] = (float)L[0] - c_R[j] * (float)L[1]; // intersect
+            if (fabs(c_R[j]) < DEG2RAD(65))
+            {
+                //printf("\nin there??\n");
+                intersect_R[j] = c_R[j] * (float)10 + d_R[j];
+                intersect_R1[j] = c_R[j] * (float)110 + d_R[j];
+                //intersect_L[i] = c[i] * (float)ASSIST_BASE_WIDTH + d[i];
+                if (intersect_R)
+                {
+                    circle_R++;
+                }
+                if (intersect_R1)
+                {
+                    circle_R++;
+                }
+                
+                line(mat_image_org_color, Point(320+L[0], L[1] + 300), Point(320+L[2], L[3] + 300), Scalar(0, 0, 255), 2, LINE_AA);
+                circle(mat_image_org_color, Point(320+intersect_R[j], 310), 10, Scalar(255, 0, 0), -1);
+                circle(mat_image_org_color, Point(320+intersect_R1[j], 420), 10, Scalar(255, 0, 0), -1);
+
+            }
 
 
-  vector<Vec4i> linesP;
-  HoughLinesP(mat_image_canny_edge, linesP, 1, CV_PI / 180, 30, 15, 10);
-
-    for (int i = 0; i < linesP.size(); i++)
-                  {
-                      float* intersect = new float[20];
-                      if (i >= NO_LINE) break;
-                      Vec4i L = linesP[i];
-                      /*
-                      int cx1 = linesP[i][0];
-                      int cy1 = linesP[i][1];
-                      int cx2 = linesP[i][2];
-                      int cy2 = linesP[i][3];
-                      */
-                      c[i] = ((float)L[2] - (float)L[0]) / ((float)L[3] - (float)L[1]); // gradient
-
-                      d[i] = (float)L[0] - c[i] * (float)L[1]; // intersect
-                      if (fabs(c[i]) < DEG2RAD(65))
-                      {
-
-                          intersect[i] = c[i] * (float)ASSIST_BASE_WIDTH + d[i];
-                         
-
-                          line(mat_image_org_color, Point(L[0], L[1] + ASSIST_BASE_LINE - ASSIST_BASE_WIDTH), Point(L[2], L[3] + ASSIST_BASE_LINE - ASSIST_BASE_WIDTH), Scalar(0, 0, 255), 2, LINE_AA);
-                          circle(mat_image_org_color, Point(intersect[i], ASSIST_BASE_LINE), 20, Scalar(255, 0, 0), -1);
-                      }
- 
-    
 
 
 
-            //    }
+        }
             Draw_Guide_Line(mat_image_org_color);
             //    line(mat_image_org_color, Point(0, 520), Point(640, 520), Scalar(0, 255, 255), 3, 0);
-           
-            mat_image_roiR = Region_of_Interest_crop(mat_image_org_color, points_R);
-            mat_image_roiL = Region_of_Interest_crop_L(mat_image_org_color, points_L);
-  
-            
-            vector<Vec3f> circles_R, circles_L;
+
+
+
+            /*vector<Vec3f> circles_R, circles_L;
             cvtColor(mat_image_roiR, mat_image_roiR, cv::COLOR_RGB2GRAY);
             cvtColor(mat_image_roiL, mat_image_roiL, cv::COLOR_RGB2GRAY);
-            HoughCircles(mat_image_roiR, circles_R, HOUGH_GRADIENT, 1, 100, 50, 35, 0, 0);
+            HoughCircles(mat_image_roiR, circles_R, HOUGH_GRADIENT, 1, mat_image_roiR.rows/6, 50, 35, 0, 0);
             circle_R = circles_R.size();
             HoughCircles(mat_image_roiL, circles_L, HOUGH_GRADIENT, 1, 100, 50, 35, 0, 0);
             circle_L = circles_L.size();
-
-            if (circle_R > circle_L)
-            {
-                printf("\ngo right\n");
-                msg.angular.z = -1;
-                
-            }
-            else if (circle_L > circle_R)
-            {
-                printf("\ngo Left\n");
-                msg.angular.z = +1;
-            }
-            else
-            {
-                printf("\nAnyway\n");
-                
-            }
-            imshow("original_image", mat_image_org_color);
-            imshow("R_image", mat_image_roiR); imshow("L_image", mat_image_roiL);
-            imwrite("mola.jpg", mat_image_org_color);
+            */
 
 
-            if (waitKey(25) == 27)
-                break;
+            //imshow("original_image", mat_image_org_color);
+            //imshow("R_image", mat_image_roiR); imshow("L_image", mat_image_roiL);
+            //imwrite("mola.jpg", mat_image_org_color);
+            //imwrite("mola1.jpg", mat_image_roiR);
+
+
+            /*if (waitKey(25) == 27)
+                break;*/
+            imshow("ori", mat_image_org_color);
+
+            
+            
+
+        }
+
+        printf("count : L:%d, R:%d ", circle_L, circle_R);
+        if (circle_R > circle_L)
+        {
+            printf("\ngo Left\n");
+            msg.angular.z=-1;
+        }
+        else if (circle_L > circle_R)
+        {
+            printf("\ngo Right\n");
+            msg.angular.z=1;
+        }
+        else
+        {
+            printf("\nAnyway\n");
+        }
+        circle_L = 0;
+        circle_R = 0;;
+
+
+        if (waitKey(25) == 27)
+            break;
 
 
 
